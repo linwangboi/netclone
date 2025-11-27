@@ -1,10 +1,25 @@
 import json
-from django.shortcuts import redirect, render
+import re
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.models import User, auth
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 
+from .models import Movie, MovieList
+
+@login_required(login_url='login')
 def index(request):
-    return render(request, 'index.html')
+    movies = Movie.objects.all()
+    context = {'movies': movies}
+    return render(request, 'index.html', context)
+
+@login_required(login_url='login')
+def movie(request, pk):
+    movie = Movie.objects.get(uu_id=pk)
+    context = {'movie': movie}
+    return render(request, 'movie.html', context)
+
 
 def login(request):
     if request.method == 'POST':
@@ -41,3 +56,28 @@ def signup(request):
             messages.info(request, 'Passwords do not match')
             return redirect('signup')
     return render(request, 'signup.html')
+
+@login_required(login_url='login')
+def logout(request):
+    auth.logout(request)
+    return redirect('login')
+
+def my_list(request):
+    pass
+
+@login_required(login_url='login')
+def add_to_list(request):
+    if request.method == 'POST':
+        movie_url_id = request.POST.get('movie_id')
+        uuid_pattern = r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
+        movie_id = re.search(uuid_pattern, movie_url_id).group(0)
+        
+        movie = get_object_or_404(Movie, uu_id=movie_id)
+        # Here you would add logic to add the movie to the user's list
+        movie_list, created = MovieList.objects.get_or_create(owner_user=request.user, movie=movie)
+        response_data = {'status': 'success', 'message': 'Added!'} if created else {'status': 'info', 'message': 'Movie already in your list.'}  
+        return JsonResponse(response_data)
+    else:
+        response_data = {'status': 'error', 'message': 'Invalid request method.'}
+        return JsonResponse(response_data, status=400)
+        
