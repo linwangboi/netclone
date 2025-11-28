@@ -11,7 +11,8 @@ from .models import Movie, MovieList
 @login_required(login_url='login')
 def index(request):
     movies = Movie.objects.all()
-    context = {'movies': movies}
+    featured_movie = movies.first()
+    context = {'movies': movies, 'featured_movie': featured_movie}
     return render(request, 'index.html', context)
 
 @login_required(login_url='login')
@@ -62,18 +63,21 @@ def logout(request):
     auth.logout(request)
     return redirect('login')
 
+@login_required(login_url='login')
 def my_list(request):
-    pass
+    context = {
+        'movies': [movie.movie for movie in MovieList.objects.filter(owner_user=request.user)]
+    }
+    return render(request, 'my_list.html', context)
 
 @login_required(login_url='login')
 def add_to_list(request):
     if request.method == 'POST':
         movie_url_id = request.POST.get('movie_id')
-        uuid_pattern = r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
+        uuid_pattern = r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
         movie_id = re.search(uuid_pattern, movie_url_id).group(0)
         
         movie = get_object_or_404(Movie, uu_id=movie_id)
-        # Here you would add logic to add the movie to the user's list
         movie_list, created = MovieList.objects.get_or_create(owner_user=request.user, movie=movie)
         response_data = {'status': 'success', 'message': 'Added!'} if created else {'status': 'info', 'message': 'Movie already in your list.'}  
         return JsonResponse(response_data)
@@ -81,3 +85,20 @@ def add_to_list(request):
         response_data = {'status': 'error', 'message': 'Invalid request method.'}
         return JsonResponse(response_data, status=400)
         
+
+@login_required(login_url='login')
+def search(request):
+    if request.method == 'POST':
+        search_term = request.POST.get('search_term')
+        movies = Movie.objects.filter(title__icontains=search_term)
+        context = {'movies': movies, 'search_term': search_term}
+        return render(request, 'search.html', context)
+    else:
+        return redirect('/')
+    
+@login_required(login_url='login')
+def genre(request, pk):
+    movie_genre = pk
+    movies = Movie.objects.filter(genre=movie_genre)
+    context = {'movies': movies, 'movie_genre': movie_genre}
+    return render(request, 'genre.html', context)
